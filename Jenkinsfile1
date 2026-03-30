@@ -4,70 +4,67 @@ pipeline {
        choice choices: ['Apache', 'Nginx'], name: 'WEBSERVER'
     }
        
-    stages {
-        stage('Create  directory for the WEB Application')
-        {
-            steps{
-               
-                //Fisrt, drop the directory if exists
-                sh 'rm -rf /home/jenkins/app-web'
-                //Create the directory
-                sh 'mkdir /home/jenkins/app-web'
-                
-            }
-        }
-        stage('Drop the container'){
-            steps {
-            echo 'droping the container...'
-            sh 'docker rm -f app-web'
-            }
-        }
-        // Apache Webserver
-        stage('Create the Apache container') {
-            when {
-                 environment name: 'WEBSERVER', value: 'Apache'
-            }
-            steps {
-            echo 'Creating the container...'
-            sh 'docker run -dit --name app-web -p 9100:80  -v /home/jenkins/app-web:/usr/local/apache2/htdocs/ httpd'
-            }
-        }
-        //Nginx webserver
-        stage('Create the Nginx container') {
-            when {
-                 environment name: 'WEBSERVER', value: 'Nginx'
-            }
-            steps {
-            echo 'Creating the container...'
-            sh 'docker run -dit --name app-web -p 9100:80  -v /home/jenkins/app-web:/usr/share/nginx/html nginx'
-         
-            }
-        }
+      environment {
+          WEBSERVER = 'Nginx'
+          JENKINS_WEB_ROOT = '/usr/share/nginx/html'
+          HOST_WEB_ROOT = '/home/mcherlo/docker/jenkins/app-web'
+          CONTAINER_NAME = 'app-web'
+      }
 
-        
-        stage('Copy the web application to the container directory') {
-            steps {
-                echo 'Copying web application...'             
-                sh 'cp -r web/* /home/jenkins/app-web'
-            }
-        }
-    }
+      stages {
+          stage('Prepare directory for the web application') {
+              steps {
+                  sh 'mkdir -p ${JENKINS_WEB_ROOT}'
+                  sh 'find ${JENKINS_WEB_ROOT} -mindepth 1 -maxdepth 1 -exec rm -rf {} +'
+              }
+          }
 
-    post {
-        always {
-            echo 'These steps are always executed'   
-        }
-      
-        success {
-        // One or more steps need to be included within each condition's block.
-          echo 'the deployment has worked'
-          archiveArtifacts allowEmptyArchive: true, artifacts: 'web/*', followSymlinks: false
-          cleanWs()         
+          stage('Drop the container') {
+              steps {
+                  echo 'droping the container...'
+                  sh 'docker rm -f ${CONTAINER_NAME} || true'
+              }
+          }
 
-       }
-       failure {
-        // One or more steps need to be included within each condition's block.
-        echo 'An error has ocurred'       
-       }
-    }
-}
+          stage('Copy the web application') {
+              steps {
+                  echo 'Copying web application...'
+                  sh 'test -d web'
+                  sh 'cp -a web/. ${JENKINS_WEB_ROOT}/'
+                  sh 'ls -la ${JENKINS_WEB_ROOT}'
+              }
+          }
+
+          stage('Create the Apache container') {
+              when {
+                  environment name: 'WEBSERVER', value: 'Apache'
+              }
+              steps {
+                  sh 'docker run -dit --name ${CONTAINER_NAME} -p 9100:80 -v ${HOST_WEB_ROOT}:/usr/local/apache2/htdocs/ httpd'
+              }
+          }
+
+          stage('Create the Nginx container') {
+              when {
+                  environment name: 'WEBSERVER', value: 'Nginx'
+              }
+              steps {
+                  sh 'docker run -dit --name ${CONTAINER_NAME} -p 9100:80 -v ${HOST_WEB_ROOT}:/usr/share/nginx/html nginx'
+              }
+          }
+      }
+
+      post {
+          always {
+              echo 'These steps are always executed'
+          }
+          success {
+              echo 'the deployment has worked'
+              archiveArtifacts allowEmptyArchive: true, artifacts: 'web/*', followSymlinks: false
+              cleanWs()
+          }
+          failure {
+              echo 'An error has ocurred'
+          }
+      }
+  }
