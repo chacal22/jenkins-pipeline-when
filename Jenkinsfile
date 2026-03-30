@@ -3,7 +3,7 @@
 
       environment {
           WEBSERVER = 'Nginx'
-          JENKINS_WEB_ROOT = '/opt/app-web'
+          JENKINS_WEB_ROOT = '/usr/share/nginx/html'
           HOST_WEB_ROOT = '/home/mcherlo/docker/jenkins/app-web'
           CONTAINER_NAME = 'app-web'
       }
