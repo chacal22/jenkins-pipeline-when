@@ -1,12 +1,12 @@
-pipeline {
-    agent any
-    parameters {
-       choice choices: ['Apache', 'Nginx'], name: 'WEBSERVER'
-    }
-       
+  pipeline {
+      agent any
+
+      parameters {
+          choice(name: 'WEBSERVER', choices: ['Apache', 'Nginx'], description: 'Web server to deploy')
+      }
+
       environment {
-          WEBSERVER = 'Nginx'
-          JENKINS_WEB_ROOT = '/usr/share/nginx/html'
+          JENKINS_WEB_ROOT = '/opt/app-web'
           HOST_WEB_ROOT = '/home/mcherlo/docker/jenkins/app-web'
           CONTAINER_NAME = 'app-web'
       }
@@ -14,6 +14,7 @@ pipeline {
       stages {
           stage('Prepare directory for the web application') {
               steps {
+                  echo "Selected web server: ${params.WEBSERVER}"
                   sh 'mkdir -p ${JENKINS_WEB_ROOT}'
                   sh 'find ${JENKINS_WEB_ROOT} -mindepth 1 -maxdepth 1 -exec rm -rf {} +'
               }
@@ -21,7 +22,7 @@ pipeline {
 
           stage('Drop the container') {
               steps {
-                  echo 'droping the container...'
+                  echo 'dropping the container...'
                   sh 'docker rm -f ${CONTAINER_NAME} || true'
               }
           }
@@ -37,18 +38,20 @@ pipeline {
 
           stage('Create the Apache container') {
               when {
-                  environment name: 'WEBSERVER', value: 'Apache'
+                  expression { params.WEBSERVER == 'Apache' }
               }
               steps {
+                  echo 'Creating Apache container...'
                   sh 'docker run -dit --name ${CONTAINER_NAME} -p 9100:80 -v ${HOST_WEB_ROOT}:/usr/local/apache2/htdocs/ httpd'
               }
           }
 
           stage('Create the Nginx container') {
               when {
-                  environment name: 'WEBSERVER', value: 'Nginx'
+                  expression { params.WEBSERVER == 'Nginx' }
               }
               steps {
+                  echo 'Creating Nginx container...'
                   sh 'docker run -dit --name ${CONTAINER_NAME} -p 9100:80 -v ${HOST_WEB_ROOT}:/usr/share/nginx/html nginx'
               }
           }
